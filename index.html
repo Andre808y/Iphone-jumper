@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Прыгай через коробки!</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     width: 100%; height: 100%;
-    background: linear-gradient(180deg, #1a2647 0%, #5c4470 45%, #d98f5e 70%, #6BBF6B 70%, #4f9750 100%);
+    /* Небо теперь рисуется самим canvas (см. drawSky в скрипте) — canvas сам подгоняется
+       под реальный вьюпорт, поэтому синхронизировать проценты CSS-градиента с его
+       геометрией было ненадёжно. Этот цвет — просто фон "пока canvas ещё не отрисовался". */
+    background: #1a2647;
     overflow: hidden;
     font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     touch-action: manipulation;
@@ -38,7 +41,7 @@
     max-height: 100%;
   }
   #hud {
-    position: absolute; top: 14px; left: 50%;
+    position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 50%;
     transform: translateX(-50%);
     display: flex; align-items: center; gap: 2px;
     background: var(--glass-bg);
@@ -57,7 +60,7 @@
   }
   .hudStat + .hudStat { border-left: 1px solid rgba(255,255,255,0.15); }
   .hudLabel {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -70,7 +73,7 @@
     line-height: 1.3;
   }
   #topControls {
-    position: absolute; top: 14px; left: 12px;
+    position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 12px;
     display: flex; gap: 8px; z-index: 9;
   }
   .iconBtn {
@@ -95,6 +98,8 @@
     font-weight: 900;
     font-size: 18px;
     text-shadow: 0 2px 10px rgba(91, 72, 184, 0.7);
+    -webkit-text-stroke: 3px rgba(10,14,26,0.65);
+    paint-order: stroke fill;
     opacity: 0;
     transition: opacity 0.2s ease;
     pointer-events: none;
@@ -103,7 +108,7 @@
   #comboText.show { opacity: 1; }
   #pauseOverlay {
     position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
     background: rgba(10,14,26,0.55);
     color: white; font-size: 26px; font-weight: 900;
     z-index: 7;
@@ -114,10 +119,13 @@
     background: rgba(8, 10, 20, 0.45);
     color: white; text-align: center;
     padding: 24px;
+    z-index: 10;
   }
   #overlayCard {
     width: 100%;
     max-width: 320px;
+    max-height: 90vh;
+    overflow-y: auto;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(22px);
@@ -133,7 +141,7 @@
     letter-spacing: -0.01em;
   }
   #overlay p {
-    font-size: 14px;
+    font-size: 16px;
     color: var(--text-soft);
     margin-bottom: 18px;
     line-height: 1.4;
@@ -162,12 +170,12 @@
     background: rgba(255,255,255,0.08);
     color: white;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 16px;
     text-align: center;
     margin-bottom: 14px;
     outline: none;
   }
-  #nameInput::placeholder { color: rgba(255,255,255,0.45); }
+  #nameInput::placeholder { color: rgba(255,255,255,0.6); }
   #nameInput:focus { border-color: var(--brand-purple); background: rgba(255,255,255,0.12); }
   #overlay button#secondaryBtn {
     background: transparent;
@@ -182,7 +190,9 @@
     cursor: pointer;
     width: 100%;
     box-shadow: none;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
   }
+  .icon-inline { flex-shrink: 0; }
   #secondaryBtn:active { background: rgba(255,255,255,0.1); }
 
   #levelToast {
@@ -194,6 +204,8 @@
     font-weight: 900;
     font-size: 30px;
     text-shadow: 0 3px 14px rgba(91, 72, 184, 0.8);
+    -webkit-text-stroke: 4px rgba(10,14,26,0.65);
+    paint-order: stroke fill;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.25s ease, transform 0.25s ease;
@@ -210,10 +222,13 @@
     background: rgba(6, 8, 16, 0.7);
     color: white; text-align: center;
     padding: 24px;
+    z-index: 11;
   }
   #leaderboardCard {
     width: 100%;
     max-width: 320px;
+    max-height: 90vh;
+    overflow-y: auto;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(22px);
@@ -222,7 +237,10 @@
     padding: 24px 20px 22px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
-  #leaderboardOverlay h1 { font-size: 19px; font-weight: 800; margin-bottom: 14px; }
+  #leaderboardOverlay h1 {
+    font-size: 19px; font-weight: 800; margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
   #leaderboardList {
     width: 100%;
     max-height: 340px;
@@ -244,6 +262,11 @@
   .lb-row:last-child { border-bottom: none; }
   .lb-rank {
     opacity: 0.75; width: 24px; text-align: left; font-weight: 700; font-size: 13px;
+  }
+  .lb-medal {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    font-size: 11px; font-weight: 800; color: #14141f;
   }
   .lb-name { flex: 1; text-align: left; padding-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-score {
@@ -267,8 +290,8 @@
 <body>
 <div id="wrap">
   <div id="topControls">
-    <button class="iconBtn" id="pauseBtn" title="Пауза">⏸</button>
-    <button class="iconBtn" id="muteBtn" title="Звук">🔊</button>
+    <button class="iconBtn" id="pauseBtn" title="Пауза"><svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></button>
+    <button class="iconBtn" id="muteBtn" title="Звук"><svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
   </div>
   <div id="hud">
     <div class="hudStat">
@@ -294,17 +317,17 @@
     <p>Тапни или нажми пробел, чтобы прыгнуть через коробки с айфонами. Не врежься!</p>
     <input id="nameInput" type="text" maxlength="20" placeholder="Ваше имя">
     <button id="startBtn">Играть</button>
-    <button id="secondaryBtn" data-action="leaderboard">🏆 Таблица лидеров</button>
+    <button id="secondaryBtn" data-action="leaderboard"><svg class="icon-inline" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg> Таблица лидеров</button>
     </div>
   </div>
   <div id="leaderboardOverlay" class="hidden">
     <div id="leaderboardCard">
-    <h1>🏆 Таблица лидеров</h1>
+    <h1><svg class="icon-inline" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg> Таблица лидеров</h1>
     <div id="leaderboardList"><div class="lb-empty">Загрузка…</div></div>
     <button id="closeLeaderboardBtn">Закрыть</button>
     </div>
   </div>
-  <div id="pauseOverlay" class="hidden">⏸ Пауза</div>
+  <div id="pauseOverlay" class="hidden"><svg class="icon-inline" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> Пауза</div>
 </div>
 
 <script>
@@ -332,13 +355,62 @@ const comboText = document.getElementById('comboText');
 // адрес бота на Render — там же крутится маленькое API таблицы лидеров
 const API_URL = 'https://my-tg-bot-v6v3.onrender.com';
 
-const W = canvas.width, H = canvas.height;
-const GROUND_Y = H - 90;
+// Логическое разрешение canvas подгоняется под реальный вьюпорт вместо фиксированных
+// 400×700 (убирает леттербоксинг — пустые полосы сверху/снизу на реальных пропорциях
+// экрана iPhone) и учитывает devicePixelRatio (убирает размытие на Retina-экранах).
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+const W = Math.min(window.innerWidth, 480);
+const H = window.innerHeight;
+canvas.style.width = W + 'px';
+canvas.style.height = H + 'px';
+canvas.width = Math.round(W * DPR);
+canvas.height = Math.round(H * DPR);
+ctx.scale(DPR, DPR);
+
+// Все "вертикальные" константы игры (рост персонажа, высота прыжка, размер препятствий и
+// т.д.) изначально подобраны под H=700. Раньше H всегда было 700 (фиксированный canvas), а
+// теперь H — реальная высота экрана устройства (750–950px на большинстве iPhone), которая
+// заметно больше. Без масштабирования эти же абсолютные пиксельные константы делают сцену
+// визуально пустой: персонаж/препятствия остаются мелкими у самого низа, а сверху — просто
+// пустое небо на 55–60% экрана. vScale держит композицию пропорционально одинаковой на любой
+// высоте экрана вместо того, чтобы просто открывать больше пустого неба.
+const REF_H = 700;
+const vScale = H / REF_H;
+
+const GROUND_Y = H - 90 * vScale;
+
+// Единая палитра сцены: раньше цвета бренда (CSS-переменные) и цвета, которыми рисует
+// canvas, жили в двух не связанных друг с другом местах — теперь один источник истины.
+const PALETTE = {
+  brandNavy: '#1e4287',
+  brandPurple: '#5b48b8',
+  skySteps: [[0, '#1a2647'], [0.45, '#5c4470'], [0.7, '#d98f5e']],
+  skylineSilhouette: '#1c2036',
+  river: '#3f6a8c',
+  groundTop: '#5cab5c',
+  groundMid: '#4f9750',
+  groundBottom: '#3a7a3f',
+  box: '#a5651b',
+  boxStroke: '#6e4212',
+  coin: '#ffd23f',
+  coinStroke: '#c9950a',
+  playerBodyLight: '#2c3a63',
+  playerBodyMid: '#232f4d',
+  playerBodyDark: '#1a2338',
+  playerCollar: '#3a4a7a',
+};
+
+const ICONS = {
+  speakerOn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  speakerMute: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  play: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8V4z"/></svg>',
+};
 
 // ---- Звук: синтезируем на лету через WebAudio, без внешних файлов ----
 let audioCtx = null;
 let muted = localStorage.getItem('jumperMuted') === '1';
-muteBtn.textContent = muted ? '🔇' : '🔊';
+muteBtn.innerHTML = muted ? ICONS.speakerMute : ICONS.speakerOn;
 
 function ensureAudio() {
   if (!audioCtx) {
@@ -374,7 +446,7 @@ const sound = {
 muteBtn.addEventListener('click', () => {
   muted = !muted;
   localStorage.setItem('jumperMuted', muted ? '1' : '0');
-  muteBtn.textContent = muted ? '🔇' : '🔊';
+  muteBtn.innerHTML = muted ? ICONS.speakerMute : ICONS.speakerOn;
 });
 
 // ---- Имя игрока: берём из Telegram, иначе даём ввести вручную ----
@@ -404,16 +476,16 @@ const player = {
   x: 70,
   y: GROUND_Y,
   vy: 0,
-  headR: 40,
-  bodyH: 46,
-  bodyW: 20,
+  headR: 40 * vScale,
+  bodyH: 46 * vScale,
+  bodyW: 20 * vScale,
   onGround: true,
   jumpsUsed: 0,
   maxJumps: 2,
 };
 
-const GRAVITY = 0.85;
-const JUMP_V = -15;
+const GRAVITY = 0.85 * vScale;
+const JUMP_V = -15 * vScale;
 
 let obstacles = [];
 let coins = [];
@@ -469,7 +541,7 @@ function resetGame() {
   gameOver = false;
   paused = false;
   pauseOverlay.classList.add('hidden');
-  pauseBtn.textContent = '⏸';
+  pauseBtn.innerHTML = ICONS.pause;
   spawnTimer = 0;
   nextSpawnIn = 70;
   coinSpawnTimer = 0;
@@ -487,25 +559,25 @@ function jump() {
 }
 
 function spawnObstacle(forceSingle) {
-  const h = 34 + Math.random() * 26 + Math.min(level, 6) * 1.5; // на высоких уровнях коробки крупнее
-  const w = 34 + Math.random() * 18;
-  obstacles.push({ x: W + 20, y: GROUND_Y - h + 40, w, h, passed: false, nearChecked: false });
+  const h = (34 + Math.random() * 26 + Math.min(level, 6) * 1.5) * vScale; // на высоких уровнях коробки крупнее
+  const w = (34 + Math.random() * 18) * vScale;
+  obstacles.push({ x: W + 20, y: GROUND_Y - h + 40 * vScale, w, h, passed: false, nearChecked: false });
 
   // начиная с 3 уровня иногда добавляем вторую коробку почти сразу следом —
   // требует чёткого двойного прыжка, а не просто одного затяжного
   if (!forceSingle && level >= 3 && Math.random() < Math.min(0.12 + level * 0.03, 0.4)) {
-    const h2 = 30 + Math.random() * 22;
-    const w2 = 30 + Math.random() * 16;
-    const gap = 46 - Math.min(level, 8) * 1.5; // на больших уровнях коробки ближе друг к другу
-    obstacles.push({ x: W + 20 + w + Math.max(gap, 22), y: GROUND_Y - h2 + 40, w: w2, h: h2, passed: false, nearChecked: false });
+    const h2 = (30 + Math.random() * 22) * vScale;
+    const w2 = (30 + Math.random() * 16) * vScale;
+    const gap = (46 - Math.min(level, 8) * 1.5) * vScale; // на больших уровнях коробки ближе друг к другу
+    obstacles.push({ x: W + 20 + w + Math.max(gap, 22 * vScale), y: GROUND_Y - h2 + 40 * vScale, w: w2, h: h2, passed: false, nearChecked: false });
   }
 }
 
 function spawnCoin() {
   // монета висит в воздухе на высоте, которую видно только на пике прыжка —
   // награда за активную игру, а не просто уклонение
-  const coinY = GROUND_Y - 60 - Math.random() * 70;
-  coins.push({ x: W + 20, y: coinY, r: 11, collected: false, spin: Math.random() * Math.PI * 2 });
+  const coinY = GROUND_Y - (60 + Math.random() * 70) * vScale;
+  coins.push({ x: W + 20, y: coinY, r: 11 * vScale, collected: false, spin: Math.random() * Math.PI * 2 });
 }
 
 function triggerLevelUp() {
@@ -528,7 +600,7 @@ function spawnParticles(x, y, color) {
       life: 30 + Math.random() * 20,
       maxLife: 30 + Math.random() * 20,
       size: 3 + Math.random() * 4,
-      color: color || '#a5651b',
+      color: color || PALETTE.box,
     });
   }
 }
@@ -544,7 +616,20 @@ function showComboText(text) {
   comboTextTimer = 55;
 }
 
+function drawSky() {
+  // Небо теперь рисуется самим canvas (а не просвечивает сквозь него из CSS-градиента
+  // body) — устраняет рассинхронизацию, когда CSS-проценты не совпадали с реальной
+  // геометрией canvas после того, как canvas стал подгоняться под реальный вьюпорт.
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  PALETTE.skySteps.forEach(([stop, color]) => grad.addColorStop(stop, color));
+  grad.addColorStop(1, PALETTE.skySteps[PALETTE.skySteps.length - 1][1]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
 function drawBackgroundDetails() {
+  drawSky();
+
   // sun glow low on the horizon (Orenburg dusk)
   ctx.save();
   ctx.globalAlpha = 0.95;
@@ -564,53 +649,60 @@ function drawBackgroundDetails() {
 
   // distant Orenburg skyline silhouette — solid, high-contrast
   const skylineY = H * 0.58;
-  const SIL = '#1c2036';
+  const SIL = PALETTE.skylineSilhouette;
   ctx.fillStyle = SIL;
   let sx = -((frame * speed * 0.12) % 90);
   while (sx < W) {
     const bw = 34 + ((sx * 37) % 40);
-    const bh = 40 + ((sx * 53) % 70);
+    const bh = (40 + ((sx * 53) % 70)) * vScale;
     ctx.fillRect(sx, skylineY - bh, bw, bh + 8);
     sx += bw + 12;
   }
   // domed building landmark
   const domeX = W * 0.22 - ((frame * speed * 0.12) % 90);
+  const domeH = 84 * vScale;
   ctx.fillStyle = SIL;
-  ctx.fillRect(domeX - 18, skylineY - 84, 36, 84);
+  ctx.fillRect(domeX - 18, skylineY - domeH, 36, domeH);
   ctx.beginPath();
-  ctx.arc(domeX, skylineY - 84, 20, Math.PI, 0);
+  ctx.arc(domeX, skylineY - domeH, 20, Math.PI, 0);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(domeX, skylineY - 122);
-  ctx.lineTo(domeX - 3, skylineY - 104);
-  ctx.lineTo(domeX + 3, skylineY - 104);
+  ctx.moveTo(domeX, skylineY - 122 * vScale);
+  ctx.lineTo(domeX - 3, skylineY - 104 * vScale);
+  ctx.lineTo(domeX + 3, skylineY - 104 * vScale);
   ctx.closePath();
   ctx.fill();
   // TV tower landmark
   const towerX = W * 0.62 - ((frame * speed * 0.12) % 90) + 90;
+  const towerH = 118 * vScale;
   ctx.strokeStyle = SIL;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(towerX - 6, skylineY);
-  ctx.lineTo(towerX, skylineY - 118);
+  ctx.lineTo(towerX, skylineY - towerH);
   ctx.moveTo(towerX + 6, skylineY);
-  ctx.lineTo(towerX, skylineY - 118);
-  ctx.moveTo(towerX - 4, skylineY - 40);
-  ctx.lineTo(towerX + 4, skylineY - 40);
+  ctx.lineTo(towerX, skylineY - towerH);
+  ctx.moveTo(towerX - 4, skylineY - 40 * vScale);
+  ctx.lineTo(towerX + 4, skylineY - 40 * vScale);
   ctx.stroke();
 
-  // label so the city reads clearly at a glance
+  // label so the city reads clearly at a glance — обводка гарантирует контраст независимо
+  // от того, какой участок неба сейчас за подписью (было rgba(255,255,255,0.55) без
+  // подложки — контраст "плавал" в зависимости от кадра)
   ctx.save();
   ctx.font = "bold 13px 'Manrope', sans-serif";
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.textAlign = 'center';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(10,14,26,0.6)';
+  ctx.strokeText('ОРЕНБУРГ', W / 2, skylineY - 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.fillText('ОРЕНБУРГ', W / 2, skylineY - 6);
   ctx.restore();
 
   // Ural river band
   const riverY = skylineY + 8;
-  const riverH = 42;
-  ctx.fillStyle = '#3f6a8c';
+  const riverH = 42 * vScale;
+  ctx.fillStyle = PALETTE.river;
   ctx.fillRect(0, riverY, W, riverH);
   ctx.strokeStyle = 'rgba(255,255,255,0.4)';
   ctx.lineWidth = 1.5;
@@ -630,14 +722,14 @@ function drawBackgroundDetails() {
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(px - 18, bridgeY);
-    ctx.lineTo(px, bridgeY - 78);
+    ctx.lineTo(px, bridgeY - 78 * vScale);
     ctx.lineTo(px + 18, bridgeY);
     ctx.stroke();
     ctx.lineWidth = 1.5;
     for (let i = 0; i <= 7; i++) {
       const t = i / 7 - 0.5;
       ctx.beginPath();
-      ctx.moveTo(px, bridgeY - 70);
+      ctx.moveTo(px, bridgeY - 70 * vScale);
       ctx.lineTo(px + t * 90, bridgeY);
       ctx.stroke();
     }
@@ -648,9 +740,9 @@ function drawBackgroundDetails() {
   // ground — с градиентом глубины и более живой текстурой травы вместо плоской заливки
   const groundTop = GROUND_Y + 40;
   const groundGrad = ctx.createLinearGradient(0, groundTop, 0, H);
-  groundGrad.addColorStop(0, '#5cab5c');
-  groundGrad.addColorStop(0.15, '#4f9750');
-  groundGrad.addColorStop(1, '#3a7a3f');
+  groundGrad.addColorStop(0, PALETTE.groundTop);
+  groundGrad.addColorStop(0.15, PALETTE.groundMid);
+  groundGrad.addColorStop(1, PALETTE.groundBottom);
   ctx.fillStyle = groundGrad;
   ctx.fillRect(0, groundTop, W, H - groundTop);
   // светлая кромка на стыке с дорогой/тротуаром — добавляет глубины
@@ -704,7 +796,7 @@ function drawPlayer() {
   ctx.fill();
 
   // legs (простые, с "кроссовками" на концах)
-  ctx.strokeStyle = '#1a2338';
+  ctx.strokeStyle = PALETTE.playerBodyDark;
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   const legOffset = player.onGround ? Math.sin(frame * 0.5) * 6 : 6;
@@ -725,9 +817,9 @@ function drawPlayer() {
 
   // body — куртка с лёгким градиентом и "молнией" для объёма, а не плоская заливка
   const bodyGrad = ctx.createLinearGradient(player.x, bodyTopY, player.x + player.bodyW, bodyTopY);
-  bodyGrad.addColorStop(0, '#2c3a63');
-  bodyGrad.addColorStop(0.5, '#232f4d');
-  bodyGrad.addColorStop(1, '#1a2338');
+  bodyGrad.addColorStop(0, PALETTE.playerBodyLight);
+  bodyGrad.addColorStop(0.5, PALETTE.playerBodyMid);
+  bodyGrad.addColorStop(1, PALETTE.playerBodyDark);
   ctx.fillStyle = bodyGrad;
   ctx.beginPath();
   ctx.roundRect(player.x, bodyTopY, player.bodyW, player.bodyH, 8);
@@ -740,7 +832,7 @@ function drawPlayer() {
   ctx.lineTo(player.x + player.bodyW / 2, bodyTopY + player.bodyH - 4);
   ctx.stroke();
   // воротник
-  ctx.fillStyle = '#3a4a7a';
+  ctx.fillStyle = PALETTE.playerCollar;
   ctx.beginPath();
   ctx.moveTo(player.x + player.bodyW / 2 - 7, bodyTopY);
   ctx.lineTo(player.x + player.bodyW / 2, bodyTopY + 7);
@@ -749,7 +841,7 @@ function drawPlayer() {
   ctx.fill();
 
   // arms
-  ctx.strokeStyle = '#232f4d';
+  ctx.strokeStyle = PALETTE.playerBodyMid;
   ctx.lineWidth = 6;
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -759,22 +851,34 @@ function drawPlayer() {
   ctx.lineTo(player.x + player.bodyW + 12, bodyTopY + (player.onGround ? 22 : 0));
   ctx.stroke();
 
-  // big head — real photo cut to the actual silhouette contour (baked into the PNG alpha), enlarged
+  // big head — real photo, cropped to a clean circle instead of the raw jagged alpha-cut
+  // edges, and "cover"-fit (fills the circle keeping natural proportions, cropping overflow)
+  // instead of stretching the whole rectangular source into it — the source photo is
+  // 379×227px (wider than tall), and forcing that shape directly into a 100×60px box
+  // squashed the face almost 2x flatter than it really is.
   const headCX = player.x + player.bodyW / 2;
   const r = player.headR;
+  const dSize = r * 2.5;
   if (faceImg.complete && faceImg.naturalWidth > 0) {
-    const aspect = faceImg.naturalHeight / faceImg.naturalWidth;
-    const dw = r * 2.5;
-    const dh = dw * aspect;
-    ctx.drawImage(
-      faceImg,
-      headCX - dw / 2, headCY - dh * 0.48,
-      dw, dh
-    );
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(headCX, headCY, dSize / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const srcAspect = faceImg.naturalWidth / faceImg.naturalHeight;
+    let drawW, drawH;
+    if (srcAspect > 1) {
+      drawH = dSize;
+      drawW = dSize * srcAspect;
+    } else {
+      drawW = dSize;
+      drawH = dSize / srcAspect;
+    }
+    ctx.drawImage(faceImg, headCX - drawW / 2, headCY - drawH / 2, drawW, drawH);
+    ctx.restore();
   } else {
     ctx.fillStyle = '#ffd6a5';
     ctx.beginPath();
-    ctx.arc(headCX, headCY, r, 0, Math.PI * 2);
+    ctx.arc(headCX, headCY, dSize / 2, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -782,9 +886,9 @@ function drawPlayer() {
 
 function drawObstacle(o) {
   // box
-  ctx.fillStyle = '#a5651b';
+  ctx.fillStyle = PALETTE.box;
   ctx.fillRect(o.x, o.y, o.w, o.h);
-  ctx.strokeStyle = '#6e4212';
+  ctx.strokeStyle = PALETTE.boxStroke;
   ctx.lineWidth = 2;
   ctx.strokeRect(o.x, o.y, o.w, o.h);
   // tape cross
@@ -811,14 +915,30 @@ function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
   return (dx * dx + dy * dy) < (r * r);
 }
 
+// splice на месте вместо .filter() — .filter() пересоздаёт массив каждый кадр (60–120 раз/сек)
+// даже когда удалять нечего, что даёт постоянный поток мусора для GC на долгих сессиях.
+function removeDead(arr, isDead) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (isDead(arr[i])) arr.splice(i, 1);
+  }
+}
+
 function checkCollision() {
   const headCX = player.x + player.bodyW / 2;
   const headCY = player.y - player.bodyH - player.headR + 6;
   const bodyRect = { x: player.x, y: player.y - player.bodyH, w: player.bodyW, h: player.bodyH };
 
   for (const o of obstacles) {
-    if (circleRectCollide(headCX, headCY, player.headR - 4, o.x, o.y, o.w, o.h)) return true;
-    if (bodyRect.x < o.x + o.w && bodyRect.x + bodyRect.w > o.x &&
+    // Расширяем прямоугольник препятствия назад на путь, пройденный им за этот кадр —
+    // защита от "тоннелирования" при скачке dt (например, после сворачивания вкладки),
+    // когда препятствие могло сдвинуться дальше собственной ширины за один шаг и обычная
+    // проверка "по текущей позиции" могла ни разу не зафиксировать пересечение.
+    const dx = o.prevDx || 0;
+    const sweptX = Math.min(o.x, o.x - dx);
+    const sweptW = o.w + Math.abs(dx);
+
+    if (circleRectCollide(headCX, headCY, player.headR - 4, sweptX, o.y, sweptW, o.h)) return true;
+    if (bodyRect.x < sweptX + sweptW && bodyRect.x + bodyRect.w > sweptX &&
         bodyRect.y < o.y + o.h && bodyRect.y + bodyRect.h > o.y) return true;
   }
   return false;
@@ -876,10 +996,17 @@ function renderLeaderboard(entries) {
     leaderboardList.innerHTML = '<div class="lb-empty">Пока никто не играл — будьте первым!</div>';
     return;
   }
-  const medals = ['🥇', '🥈', '🥉'];
+  // Цветные кружки с номером места вместо эмодзи-медалей — эмодзи рендерятся по-разному
+  // на iOS/Android/десктопе (разный рисунок, разный размер), что для сравнения мест в
+  // рейтинге не годится: у всех игроков должно выглядеть одинаково.
+  const medalColors = ['#ffd23f', '#c9d3e0', '#e0a458'];
   leaderboardList.innerHTML = entries.map((e, i) => `
     <div class="lb-row">
-      <span class="lb-rank">${medals[i] || (i + 1)}</span>
+      <span class="lb-rank">${
+        i < 3
+          ? `<span class="lb-medal" style="background:${medalColors[i]}">${i + 1}</span>`
+          : (i + 1)
+      }</span>
       <span class="lb-name">${escapeHtml(e.name)}</span>
       <span class="lb-score">${e.score}</span>
     </div>
@@ -909,8 +1036,9 @@ function update(dt) {
     player.jumpsUsed = 0;
   }
   if (squash > 0) {
-    squash -= 0.08 * dt;
-    if (squash < 0) squash = 0;
+    // экспоненциальное (eased) затухание вместо линейного — быстрее в начале, плавнее к концу
+    squash *= Math.pow(0.85, dt);
+    if (squash < 0.02) squash = 0;
   }
 
   // spawn obstacles — интервал сокращается с ростом уровня, то есть коробки идут гуще
@@ -932,7 +1060,9 @@ function update(dt) {
 
   // move obstacles + score + комбо + бонус за пролёт впритык
   for (const o of obstacles) {
-    o.x -= speed * dt;
+    const stepDx = speed * dt;
+    o.x -= stepDx;
+    o.prevDx = stepDx; // для проверки коллизии по "заметённому" прямоугольнику, см. checkCollision
 
     // "впритык": один раз засчитываем, если игрок только что чисто перелетел коробку с маленьким запасом по высоте
     if (!o.nearChecked && !player.onGround && o.x < player.x + player.bodyW && o.x + o.w > player.x - 4) {
@@ -962,7 +1092,7 @@ function update(dt) {
       }
     }
   }
-  obstacles = obstacles.filter(o => o.x + o.w > -10);
+  removeDead(obstacles, o => o.x + o.w <= -10);
 
   // move + collect coins
   const headCX = player.x + player.bodyW / 2;
@@ -976,13 +1106,13 @@ function update(dt) {
         c.collected = true;
         score += 3;
         scoreEl.textContent = score;
-        spawnParticles(c.x, c.y, '#ffd23f');
+        spawnParticles(c.x, c.y, PALETTE.coin);
         sound.coin();
         if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       }
     }
   }
-  coins = coins.filter(c => c.x > -20 && !c.collected);
+  removeDead(coins, c => c.x <= -20 || c.collected);
 
   // particles physics
   for (const p of particles) {
@@ -991,7 +1121,7 @@ function update(dt) {
     p.vy += 0.25 * dt;
     p.life -= dt;
   }
-  particles = particles.filter(p => p.life > 0);
+  removeDead(particles, p => p.life <= 0);
 
   if (comboTextTimer > 0) {
     comboTextTimer -= dt;
@@ -1012,7 +1142,7 @@ function update(dt) {
 
   if (checkCollision()) {
     combo = 0;
-    spawnParticles(headCX, headCY, '#a5651b');
+    spawnParticles(headCX, headCY, PALETTE.box);
     triggerShake(10, 18);
     endGame();
   }
@@ -1023,11 +1153,11 @@ function drawCoin(c) {
   ctx.translate(c.x, c.y);
   const squeeze = Math.abs(Math.cos(c.spin));
   ctx.scale(Math.max(0.15, squeeze), 1);
-  ctx.fillStyle = '#ffd23f';
+  ctx.fillStyle = PALETTE.coin;
   ctx.beginPath();
   ctx.arc(0, 0, c.r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#c9950a';
+  ctx.strokeStyle = PALETTE.coinStroke;
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();
@@ -1056,14 +1186,30 @@ function drawLogoWatermark() {
   if (!(logoImg.complete && logoImg.naturalWidth > 0)) return;
   const lw = 104;
   const lh = lw * (logoImg.naturalHeight / logoImg.naturalWidth);
+  // ниже строки HUD, чтобы не тесниться с ней в углу
+  const px = W - lw - 12, py = 68, pad = 8;
+
+  // светлая "стеклянная" подложка — сам логотип тёмно-синий, а верх неба в этом месте
+  // почти того же тёмно-синего цвета; без подложки бейдж визуально терялся на небе
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.beginPath();
+  ctx.roundRect(px - pad, py - pad, lw + pad * 2, lh + pad * 2, 16);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+
   ctx.save();
   // subtle drop shadow keeps it legible against the sky without a solid backing
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 2;
   ctx.globalAlpha = 0.92;
-  // ниже строки HUD, чтобы не тесниться с ней в углу
-  ctx.drawImage(logoImg, W - lw - 12, 68, lw, lh);
+  ctx.drawImage(logoImg, px, py, lw, lh);
   ctx.restore();
 }
 
@@ -1102,7 +1248,7 @@ function loop(timestamp) {
 function togglePause() {
   if (!running) return;
   paused = !paused;
-  pauseBtn.textContent = paused ? '▶' : '⏸';
+  pauseBtn.innerHTML = paused ? ICONS.play : ICONS.pause;
   pauseOverlay.classList.toggle('hidden', !paused);
 }
 
@@ -1139,8 +1285,18 @@ document.getElementById('wrap').addEventListener('pointerdown', (e) => {
 
 faceImg.onload = draw;
 logoImg.onload = draw;
-draw();
-requestAnimationFrame(loop);
+requestAnimationFrame(loop); // цикл уже "тёплый" — до running=true он просто ничего не рисует
+
+// Первый кадр (стартовый экран позади прозрачной карточки) рисуем только после того, как
+// догрузятся и шрифт, и обе картинки — иначе он мог отрисоваться с фолбэк-шрифтом вместо
+// Manrope или с пустыми кружками вместо лица/лого и не перерисоваться до старта игры,
+// потому что игровой цикл не перерисовывает кадры, пока running === false.
+Promise.all([
+  document.fonts ? document.fonts.ready : Promise.resolve(),
+  faceImg.decode ? faceImg.decode().catch(() => {}) : Promise.resolve(),
+  logoImg.decode ? logoImg.decode().catch(() => {}) : Promise.resolve(),
+]).then(draw);
+draw(); // и сразу один черновой кадр — чтобы экран не был пустым, пока грузится вышеперечисленное
 </script>
 </body>
 </html>
